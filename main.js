@@ -26,8 +26,16 @@ define((require, exports, module) => {
       readFile;
 
   AppInit.appReady(() => {
-    menus.addMenu("Template", "anyTplMenu");
-    getContents();
+    if (getContents) {
+      menus.addMenu("Template", "anyTplMenu");
+      getContents();
+    } else {
+      dialogs.showModalDialog(
+        "anyTplInstall",
+        "Any Template",
+        "Please restart Brackets to activate the \"Any Template\" extension."
+      );
+    }
   });
 
   getContents = () => {
