@@ -17,7 +17,7 @@ define((require, exports, module) => {
       dialogs = brackets.getModule("widgets/Dialogs"),
       templateDir,
       registeredFiles,
-      fileInfo,
+      fileId,
 
       getContents,
       menuFiles,
@@ -71,11 +71,7 @@ define((require, exports, module) => {
       registeredFiles["anyTpl" + i] = el.file;
 
       commandManager.register(el.name, "anyTpl" + i, () => {
-        fileInfo = {
-          id: "anyTpl" + i,
-          fType: el.type
-        };
-
+        fileId = "anyTpl" + i;
         openModule();
       });
 
@@ -87,7 +83,7 @@ define((require, exports, module) => {
       commandManager.register("- empty -", "anyTplNull", () => {
         dialogs.showModalDialog(
           "anyTplEmptyMsg",
-          "Set Template",
+          "Any Template",
           "Add files to your templates folder in order to make them available in the \"Template\" menu. <br>Once you add files, restart Brackets."
         );
       });
@@ -108,7 +104,7 @@ define((require, exports, module) => {
   openModule = () => {
     dialogs.showModalDialog(
       "anyTplAction",
-      "Set Template",
+      "Any Template",
       "Which action would you like to take?",
       [
         {
@@ -131,7 +127,7 @@ define((require, exports, module) => {
     let count = documentManager.getAllOpenDocuments().length,
         doc;
 
-    registeredFiles[fileInfo.id].read((err, data) => {
+    registeredFiles[fileId].read((err, data) => {
       if (id === "cancelFile") {
         return;
       }
@@ -139,7 +135,7 @@ define((require, exports, module) => {
       if (err) {
         dialogs.showModalDialog(
           "anyTplErrMsg",
-          "Set Template",
+          "Any Template",
           "There was an error loading your template file. Check your templates folder and restart Brackets."
         );
 
@@ -148,7 +144,7 @@ define((require, exports, module) => {
       }
 
       if (id === "untitledFile") {
-        doc = documentManager.createUntitledDocument(count, "." + fileInfo.fType);
+        doc = documentManager.createUntitledDocument(count, "");
 
         doc.setText(data);
         documentManager.setCurrentDocument(doc);
