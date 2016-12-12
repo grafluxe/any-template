@@ -164,7 +164,15 @@ define((require, exports, module) => {
 
   menuOpenDir = () => {
     CommandManager.register("Open Templates Folder...", "anyTplDir", () => {
-      brackets.app.showOSFolder(templatesPath);
+      brackets.app.showOSFolder(templatesPath, (id) => {
+        if (id) {
+          Dialogs.showModalDialog(
+            "anyTpl",
+            "Any Template",
+            "Your folder no longer exists. Please update the path in your preference file and restart Brackets."
+          );
+        }
+      });
     });
 
     Menus.getMenu("anyTplMenu").addMenuDivider();
