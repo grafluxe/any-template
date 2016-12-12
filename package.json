@@ -4,7 +4,7 @@
   "description": "Easily create and use YOUR own template files. This extension adds a new menu item to the main menu bar which lists any template files you create. Templates can be of any file type supported by Brackets.",
   "author": "Leandro Silva (http://grafluxe.com)",
   "homepage": "https://github.com/Grafluxe/any-template",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "categories": "codegen",
   "license": "MIT",
   "engines": {

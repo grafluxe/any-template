@@ -16,12 +16,14 @@ define((require, exports, module) => {
       FileSystem = brackets.getModule("filesystem/FileSystem"),
       Dialogs = brackets.getModule("widgets/Dialogs"),
       PreferencesManager = brackets.getModule("preferences/PreferencesManager"),
+      MainViewManager = brackets.getModule("view/MainViewManager"),
       templatesPath,
       registeredFiles,
       fileId,
 
       init,
       prefs,
+      initModule,
       onInitModule,
       selectDir,
       setPath,
@@ -30,17 +32,25 @@ define((require, exports, module) => {
       menuFiles,
       menuOpenDir,
       openModule,
-      readFile;
+      readFile,
+      count = 10;
 
   init = () => {
     prefs = PreferencesManager.getExtensionPrefs("anyTemplate");
     templatesPath = prefs.get("templatesPath");
 
+    MainViewManager.on("workingSetAdd", () => count++);
+
     if (templatesPath) {
       setMenu();
       getContents();
     } else {
-      Dialogs.showModalDialog(
+      initModule();
+    }
+  };
+
+  initModule = () => {
+    Dialogs.showModalDialog(
         "anyTpl",
         "Any Template",
         "Select a folder to load your templates from. <br>Note: If ever you need to edit the folders path, you can find it in your preference file.",
@@ -55,7 +65,6 @@ define((require, exports, module) => {
           }
         ]
       ).done(onInitModule);
-    }
   };
 
   onInitModule = (id) => {
@@ -87,7 +96,7 @@ define((require, exports, module) => {
     }
 
     if (fi.length === 0) {
-      init();
+      initModule();
     } else {
       templatesPath = fi[0];
       prefs.set("templatesPath", templatesPath);
@@ -185,8 +194,7 @@ define((require, exports, module) => {
   };
 
   readFile = (id) => {
-    let count = DocumentManager.getAllOpenDocuments().length + 1,
-        doc;
+    let doc;
 
     registeredFiles[fileId].read((err, data) => {
       if (id === "cancel") {
