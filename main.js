@@ -8,41 +8,101 @@
 define((require, exports, module) => {
   "use strict";
 
-  let appInit = brackets.getModule("utils/AppInit"),
-      commandManager = brackets.getModule("command/CommandManager"),
-      commands = brackets.getModule("command/Commands"),
-      menus = brackets.getModule("command/Menus"),
-      documentManager = brackets.getModule("document/DocumentManager"),
-      fileSystem = brackets.getModule("filesystem/FileSystem"),
-      fileUtils = brackets.getModule("file/FileUtils"),
-      dialogs = brackets.getModule("widgets/Dialogs"),
-      templateDir,
+  let AppInit = brackets.getModule("utils/AppInit"),
+      CommandManager = brackets.getModule("command/CommandManager"),
+      Commands = brackets.getModule("command/Commands"),
+      Menus = brackets.getModule("command/Menus"),
+      DocumentManager = brackets.getModule("document/DocumentManager"),
+      FileSystem = brackets.getModule("filesystem/FileSystem"),
+      Dialogs = brackets.getModule("widgets/Dialogs"),
+      PreferencesManager = brackets.getModule("preferences/PreferencesManager"),
+      templatesPath,
       registeredFiles,
       fileId,
 
+      init,
+      prefs,
+      onInitModule,
+      selectDir,
+      setPath,
+      setMenu,
       getContents,
       menuFiles,
       menuOpenDir,
       openModule,
       readFile;
 
-  appInit.appReady(() => {
-    if (getContents) {
-      menus.addMenu("Template", "anyTplMenu", menus.AFTER, menus.AppMenuBar.NAVIGATE_MENU);
+  init = () => {
+    prefs = PreferencesManager.getExtensionPrefs("anyTemplate");
+    templatesPath = prefs.get("templatesPath");
+
+    if (templatesPath) {
+      setMenu();
       getContents();
     } else {
-      dialogs.showModalDialog(
-        "anyTplInstall",
+      Dialogs.showModalDialog(
+        "anyTpl",
         "Any Template",
-        "Please restart Brackets to activate the \"Any Template\" extension."
-      );
+        "Select a folder to load your templates from. <br>Note: If ever you need to edit the folders path, you can find it in your preference file.",
+        [
+          {
+            id: "select",
+            text: "Select A Folder"
+          },
+          {
+            id: "cancel",
+            text: "Cancel"
+          }
+        ]
+      ).done(onInitModule);
     }
-  });
+  };
+
+  onInitModule = (id) => {
+    if (id === "select") {
+      setPath();
+    }
+  };
+
+  setPath = () => {
+    FileSystem.showOpenDialog(
+      false,
+      true,
+      "Select a templates path",
+      brackets.app.getUserDocumentsDirectory(),
+      null,
+      selectDir
+    );
+  };
+
+  selectDir = (err, fi) => {
+    if (err) {
+      console.error(err);
+      Dialogs.showModalDialog(
+        "anyTpl",
+        "Any Template",
+        "There was an error with your selection."
+      );
+      return;
+    }
+
+    if (fi.length === 0) {
+      init();
+    } else {
+      templatesPath = fi[0];
+      prefs.set("templatesPath", templatesPath);
+
+      setMenu();
+      getContents();
+    }
+  };
+
+  setMenu = () => {
+    Menus.addMenu("Template", "anyTplMenu", Menus.AFTER, Menus.AppMenuBar.NAVIGATE_MENU);
+  };
 
   getContents = () => {
-    templateDir = fileSystem.getDirectoryForPath(fileUtils.getDirectoryPath(decodeURI(module.uri)) + "templates/");
-
-    templateDir.getContents((a, files) => {
+    FileSystem.getDirectoryForPath(templatesPath).getContents((a, files) => {
       let match,
           toSort = [];
 
@@ -71,53 +131,53 @@ define((require, exports, module) => {
     items.forEach((el, i) => {
       registeredFiles["anyTpl" + i] = el.file;
 
-      commandManager.register(el.name, "anyTpl" + i, () => {
+      CommandManager.register(el.name, "anyTpl" + i, () => {
         fileId = "anyTpl" + i;
         openModule();
       });
 
-      menus.getMenu("anyTplMenu").addMenuItem("anyTpl" + i);
+      Menus.getMenu("anyTplMenu").addMenuItem("anyTpl" + i);
     });
 
     //empty templates dir
     if (items.length === 0) {
-      commandManager.register("- empty -", "anyTplNull", () => {
-        dialogs.showModalDialog(
-          "anyTplEmptyMsg",
+      CommandManager.register("- empty -", "anyTplNull", () => {
+        Dialogs.showModalDialog(
+          "anyTpl",
           "Any Template",
           "Add files to your templates folder in order to make them available in the \"Template\" menu. <br>Once you add files, restart Brackets."
         );
       });
 
-      menus.getMenu("anyTplMenu").addMenuItem("anyTplNull");
+      Menus.getMenu("anyTplMenu").addMenuItem("anyTplNull");
     }
   };
 
   menuOpenDir = () => {
-    commandManager.register("Templates Folder...", "anyTplDir", () => {
-      brackets.app.showOSFolder(templateDir.fullPath);
+    CommandManager.register("Open Templates Folder...", "anyTplDir", () => {
+      brackets.app.showOSFolder(templatesPath);
     });
 
-    menus.getMenu("anyTplMenu").addMenuDivider();
-    menus.getMenu("anyTplMenu").addMenuItem("anyTplDir");
+    Menus.getMenu("anyTplMenu").addMenuDivider();
+    Menus.getMenu("anyTplMenu").addMenuItem("anyTplDir");
   };
 
   openModule = () => {
-    dialogs.showModalDialog(
-      "anyTplAction",
+    Dialogs.showModalDialog(
+      "anyTpl",
       "Any Template",
       "Which action would you like to take?",
       [
         {
-          id: "untitledFile",
+          id: "untitled",
           text: "Create Untitled Document"
         },
         {
-          id: "overwriteFile",
+          id: "overwrite",
           text: "Overwrite Current Document"
         },
         {
-          id: "cancelFile",
+          id: "cancel",
           text: "Cancel"
         }
       ]
@@ -125,17 +185,17 @@ define((require, exports, module) => {
   };
 
   readFile = (id) => {
-    let count = documentManager.getAllOpenDocuments().length,
+    let count = DocumentManager.getAllOpenDocuments().length + 1,
         doc;
 
     registeredFiles[fileId].read((err, data) => {
-      if (id === "cancelFile") {
+      if (id === "cancel") {
         return;
       }
 
       if (err) {
-        dialogs.showModalDialog(
-          "anyTplErrMsg",
+        Dialogs.showModalDialog(
+          "anyTpl",
           "Any Template",
           "There was an error loading your template file. Check your templates folder and restart Brackets."
         );
@@ -144,15 +204,16 @@ define((require, exports, module) => {
         return;
       }
 
-      if (id === "untitledFile") {
-        doc = documentManager.createUntitledDocument(count, "");
+      if (id === "untitled") {
+        doc = DocumentManager.createUntitledDocument(count, "");
 
         doc.setText(data);
-        commandManager.execute(commands.CMD_OPEN, doc.file);
-      } else if (id === "overwriteFile") {
-        documentManager.getCurrentDocument().setText(data);
+        CommandManager.execute(Commands.CMD_OPEN, doc.file);
+      } else if (id === "overwrite") {
+        DocumentManager.getCurrentDocument().setText(data);
       }
     });
   };
 
+  AppInit.appReady(init);
 });

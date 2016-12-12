@@ -4,6 +4,16 @@ This Brackets extension allows you to easily create and use *your own* template 
 
 ![Screenshot](./screenshot.gif)
 
+## Add/Edit Templates
+
+- From the "Template" menu item, select "Open Templates Folder..."
+- Add any file type supported by Brackets.
+- Restart Brackets to see updated files.
+
+#### Download Templates
+
+Optionally, you can find some templates [here](https://github.com/Grafluxe/templates).
+
 ## Select Template
 
 - From the "Template" menu item, select your desired template file.
@@ -13,11 +23,10 @@ This Brackets extension allows you to easily create and use *your own* template 
   - Overwrite Current Document
   - Cancel
 
-## Add/Edit Templates
+## Edit Template Path
 
-- From the "Template" menu item, select "Templates Folder..."
-- Add any file type supported by Brackets.
-- Restart Brackets to see updated files.
+- Upon first installing this extension, you will be asked to select a folder to load your templates from.
+- If ever you need to edit the folders path, you can find it in your preference file.
 
 ## Install Extension
 
