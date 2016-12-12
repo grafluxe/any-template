@@ -14,6 +14,7 @@ define((require, exports, module) => {
       Menus = brackets.getModule("command/Menus"),
       DocumentManager = brackets.getModule("document/DocumentManager"),
       FileSystem = brackets.getModule("filesystem/FileSystem"),
+      FileUtils = brackets.getModule("file/FileUtils"),
       Dialogs = brackets.getModule("widgets/Dialogs"),
       PreferencesManager = brackets.getModule("preferences/PreferencesManager"),
       MainViewManager = brackets.getModule("view/MainViewManager"),
@@ -112,17 +113,19 @@ define((require, exports, module) => {
 
   getContents = () => {
     FileSystem.getDirectoryForPath(templatesPath).getContents((a, files) => {
-      let match,
-          toSort = [];
+      let toSort = [],
+          fType,
+          fName;
 
       files.forEach((el) => {
-        match = el.toString().match(/([\w\-. ']+)\.([\w\-. ']+)+\]$/);
+        if (el.isFile) {
+          fType = FileUtils.getFileExtension(el.name) || ".";
+          fName = FileUtils.getFilenameWithoutExtension(el.name);
 
-        if (match) {
           toSort.push({
-            name: "<" + match[2] + "> " + match[1],
+            name: "<" + fType + "> " + fName,
             file: el,
-            type: match[2]
+            type: fType
           });
         }
       });
