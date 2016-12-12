@@ -8,8 +8,9 @@
 define((require, exports, module) => {
   "use strict";
 
-  let AppInit = brackets.getModule("utils/AppInit"),
+  let appInit = brackets.getModule("utils/AppInit"),
       commandManager = brackets.getModule("command/CommandManager"),
+      commands = brackets.getModule("command/Commands"),
       menus = brackets.getModule("command/Menus"),
       documentManager = brackets.getModule("document/DocumentManager"),
       fileSystem = brackets.getModule("filesystem/FileSystem"),
@@ -25,9 +26,9 @@ define((require, exports, module) => {
       openModule,
       readFile;
 
-  AppInit.appReady(() => {
+  appInit.appReady(() => {
     if (getContents) {
-      menus.addMenu("Template", "anyTplMenu");
+      menus.addMenu("Template", "anyTplMenu", menus.AFTER, menus.AppMenuBar.NAVIGATE_MENU);
       getContents();
     } else {
       dialogs.showModalDialog(
@@ -147,7 +148,7 @@ define((require, exports, module) => {
         doc = documentManager.createUntitledDocument(count, "");
 
         doc.setText(data);
-        documentManager.setCurrentDocument(doc);
+        commandManager.execute(commands.CMD_OPEN, doc.file);
       } else if (id === "overwriteFile") {
         documentManager.getCurrentDocument().setText(data);
       }
