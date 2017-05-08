@@ -1,6 +1,6 @@
 # Any Template
 
-This Brackets extension allows you to easily create and use *your own* template files. It adds a new "Template" menu item to the main menu bar which lists any template files you create. Templates can be of any file type supported by Brackets.
+This Adobe Brackets extension allows you to easily create and use *your own* template files. It adds a new "Template" menu item to the main menu bar which lists any template files you create. Templates can be of any file type supported by Brackets.
 
 ![Screenshot](./screenshot.gif)
 
@@ -10,7 +10,7 @@ This Brackets extension allows you to easily create and use *your own* template 
 - Add any file type supported by Brackets.
 - Restart Brackets to see updated files.
 
-#### Download Templates
+### Download Templates
 
 Optionally, you can find some templates [here](https://github.com/Grafluxe/templates).
 
@@ -37,9 +37,51 @@ In the Brackets Extension Manager, either:
 
 Restart Brackets after install.
 
+## Changelog
+
+### 2.4.0
+
+- Add file extensions to newly created untitled files (so that code hinting and formatting works).
+  - Brackets 1.9 now supports [language mode changing](https://github.com/adobe/brackets/pull/13086) on untitled files.
+- Babelify logic to ES5 (in order to support certain Linux distributions).
+
+### 2.3.0
+
+- Support files with no extension.
+
+### 2.2.0
+
+- Handle cases where the templates folder no longer exists.
+
+### 2.1.0
+
+- Update counter logic for when creating untitled documents.
+  - Counter now updates on the "workingSetAdd" event.
+  - Starting file counter at 10 so to better avoid Brackets "duplicated in mru list" issue.
+
+### 2.0.0
+
+- Rewrite logic to allow users to choose their own template path.
+- Clean up code.
+
+### 1.1.0
+
+- Replace deprecated Brackets method with new one.
+- Hard set menu item location.
+
+### 1.0.1
+
+- Fix issue where Brackets throws an error if an untitled file has an extension.
+  - Due to this [limitation](https://trello.com/c/CNXuU4TY/1369-switch-language-type-of-untitled-documents), I no longer set a file type, so code hinting will not work until the file is saved.
+- Rename module titles.
+
+### 1.0.0
+
+- Initial release.
+
 ## License
 
-Copyright (c) 2016 Leandro Silva (http://grafluxe.com)
+Copyright (c) 2016 - 2017 Leandro Silva (http://grafluxe.com)
 
 Released under the MIT License.
 

@@ -1,14 +1,18 @@
+"use strict";
+
 /**
- * @author Leandro Silva | Grafluxe, 2016
+ * @author Leandro Silva
+ * @copyright 2016 - 2017 Leandro Silva (http://grafluxe.com)
+ * @license MIT
  */
 
 /*global define, brackets */
-/*jshint unused:false */
+//jshint esversion: 6, devel: true
 
-define((require, exports, module) => {
+define(function (require, exports, module) {
   "use strict";
 
-  let AppInit = brackets.getModule("utils/AppInit"),
+  var AppInit = brackets.getModule("utils/AppInit"),
       CommandManager = brackets.getModule("command/CommandManager"),
       Commands = brackets.getModule("command/Commands"),
       Menus = brackets.getModule("command/Menus"),
@@ -18,29 +22,30 @@ define((require, exports, module) => {
       Dialogs = brackets.getModule("widgets/Dialogs"),
       PreferencesManager = brackets.getModule("preferences/PreferencesManager"),
       MainViewManager = brackets.getModule("view/MainViewManager"),
-      templatesPath,
-      registeredFiles,
-      fileId,
-
-      init,
-      prefs,
-      initModule,
-      onInitModule,
-      selectDir,
-      setPath,
-      setMenu,
-      getContents,
-      menuFiles,
-      menuOpenDir,
-      openModule,
-      readFile,
+      templatesPath = void 0,
+      registeredFiles = void 0,
+      fileId = void 0,
+      init = void 0,
+      prefs = void 0,
+      initModule = void 0,
+      onInitModule = void 0,
+      selectDir = void 0,
+      setPath = void 0,
+      setMenu = void 0,
+      getContents = void 0,
+      menuFiles = void 0,
+      menuOpenDir = void 0,
+      openModule = void 0,
+      readFile = void 0,
       count = 10;
 
-  init = () => {
+  init = function init() {
     prefs = PreferencesManager.getExtensionPrefs("anyTemplate");
     templatesPath = prefs.get("templatesPath");
 
-    MainViewManager.on("workingSetAdd", () => count++);
+    MainViewManager.on("workingSetAdd", function () {
+      return count++;
+    });
 
     if (templatesPath) {
       setMenu();
@@ -50,49 +55,30 @@ define((require, exports, module) => {
     }
   };
 
-  initModule = () => {
-    Dialogs.showModalDialog(
-        "anyTpl",
-        "Any Template",
-        "Select a folder to load your templates from. <br>Note: If ever you need to edit the folders path, you can find it in your preference file.",
-        [
-          {
-            id: "select",
-            text: "Select A Folder"
-          },
-          {
-            id: "cancel",
-            text: "Cancel"
-          }
-        ]
-      ).done(onInitModule);
+  initModule = function initModule() {
+    Dialogs.showModalDialog("anyTpl", "Any Template", "Select a folder to load your templates from. <br>Note: If ever you need to edit the folders path, you can find it in your preference file.", [{
+      id: "select",
+      text: "Select A Folder"
+    }, {
+      id: "cancel",
+      text: "Cancel"
+    }]).done(onInitModule);
   };
 
-  onInitModule = (id) => {
+  onInitModule = function onInitModule(id) {
     if (id === "select") {
       setPath();
     }
   };
 
-  setPath = () => {
-    FileSystem.showOpenDialog(
-      false,
-      true,
-      "Select a templates path",
-      brackets.app.getUserDocumentsDirectory(),
-      null,
-      selectDir
-    );
+  setPath = function setPath() {
+    FileSystem.showOpenDialog(false, true, "Select a templates path", brackets.app.getUserDocumentsDirectory(), null, selectDir);
   };
 
-  selectDir = (err, fi) => {
+  selectDir = function selectDir(err, fi) {
     if (err) {
       console.error(err);
-      Dialogs.showModalDialog(
-        "anyTpl",
-        "Any Template",
-        "There was an error with your selection."
-      );
+      Dialogs.showModalDialog("anyTpl", "Any Template", "There was an error with your selection.");
       return;
     }
 
@@ -107,17 +93,17 @@ define((require, exports, module) => {
     }
   };
 
-  setMenu = () => {
+  setMenu = function setMenu() {
     Menus.addMenu("Template", "anyTplMenu", Menus.AFTER, Menus.AppMenuBar.NAVIGATE_MENU);
   };
 
-  getContents = () => {
-    FileSystem.getDirectoryForPath(templatesPath).getContents((a, files) => {
-      let toSort = [],
-          fType,
-          fName;
+  getContents = function getContents() {
+    FileSystem.getDirectoryForPath(templatesPath).getContents(function (a, files) {
+      var toSort = [],
+          fType = void 0,
+          fName = void 0;
 
-      files.forEach((el) => {
+      files.forEach(function (el) {
         if (el.isFile) {
           fType = FileUtils.getFileExtension(el.name) || ".";
           fName = FileUtils.getFilenameWithoutExtension(el.name);
@@ -130,20 +116,22 @@ define((require, exports, module) => {
         }
       });
 
-      toSort.sort((a, b) => a.name.localeCompare(b.name));
+      toSort.sort(function (a, b) {
+        return a.name.localeCompare(b.name);
+      });
 
       menuFiles(toSort);
       menuOpenDir();
     });
   };
 
-  menuFiles = (items) => {
+  menuFiles = function menuFiles(items) {
     registeredFiles = {};
 
-    items.forEach((el, i) => {
+    items.forEach(function (el, i) {
       registeredFiles["anyTpl" + i] = el.file;
 
-      CommandManager.register(el.name, "anyTpl" + i, () => {
+      CommandManager.register(el.name, "anyTpl" + i, function () {
         fileId = "anyTpl" + i;
         openModule();
       });
@@ -153,78 +141,59 @@ define((require, exports, module) => {
 
     //empty templates dir
     if (items.length === 0) {
-      CommandManager.register("- empty -", "anyTplNull", () => {
-        Dialogs.showModalDialog(
-          "anyTpl",
-          "Any Template",
-          "Add files to your templates folder in order to make them available in the \"Template\" menu. <br>Once you add files, restart Brackets."
-        );
+      CommandManager.register("- empty -", "anyTplNull", function () {
+        Dialogs.showModalDialog("anyTpl", "Any Template", "Add files to your templates folder in order to make them available in the \"Template\" menu. <br>Once you add files, restart Brackets.");
       });
 
       Menus.getMenu("anyTplMenu").addMenuItem("anyTplNull");
     }
   };
 
-  menuOpenDir = () => {
-    CommandManager.register("Open Templates Folder...", "anyTplDir", () => {
-      brackets.app.showOSFolder(templatesPath, (id) => {
+  menuOpenDir = function menuOpenDir() {
+    CommandManager.register("Open Templates Folder...", "anyTplOpenDir", function () {
+      brackets.app.showOSFolder(templatesPath, function (id) {
         if (id) {
-          Dialogs.showModalDialog(
-            "anyTpl",
-            "Any Template",
-            "Your folder no longer exists. Please update the path in your preference file and restart Brackets."
-          );
+          Dialogs.showModalDialog("anyTpl", "Any Template", "Your folder no longer exists. Please update the path in your preference file and restart Brackets.");
         }
       });
     });
 
     Menus.getMenu("anyTplMenu").addMenuDivider();
-    Menus.getMenu("anyTplMenu").addMenuItem("anyTplDir");
+    Menus.getMenu("anyTplMenu").addMenuItem("anyTplOpenDir");
   };
 
-  openModule = () => {
-    Dialogs.showModalDialog(
-      "anyTpl",
-      "Any Template",
-      "Which action would you like to take?",
-      [
-        {
-          id: "untitled",
-          text: "Create Untitled Document"
-        },
-        {
-          id: "overwrite",
-          text: "Overwrite Current Document"
-        },
-        {
-          id: "cancel",
-          text: "Cancel"
-        }
-      ]
-    ).done(readFile);
+  openModule = function openModule() {
+    Dialogs.showModalDialog("anyTpl", "Any Template", "Which action would you like to take?", [{
+      id: "untitled",
+      text: "Create Untitled Document"
+    }, {
+      id: "overwrite",
+      text: "Overwrite Current Document"
+    }, {
+      id: "cancel",
+      text: "Cancel"
+    }]).done(readFile);
   };
 
-  readFile = (id) => {
-    let doc;
+  readFile = function readFile(id) {
+    var doc = void 0,
+        fi = registeredFiles[fileId],
+        ext = FileUtils.getFileExtension(fi.name);
 
-    registeredFiles[fileId].read((err, data) => {
+    fi.read(function (err, data) {
       if (id === "cancel") {
         return;
       }
 
       if (err) {
-        Dialogs.showModalDialog(
-          "anyTpl",
-          "Any Template",
-          "There was an error loading your template file. Check your templates folder and restart Brackets."
-        );
+        Dialogs.showModalDialog("anyTpl", "Any Template", "There was an error loading your template file. Check your templates folder and restart Brackets.");
 
         console.error("Template Error:", err);
         return;
       }
 
       if (id === "untitled") {
-        doc = DocumentManager.createUntitledDocument(count, "");
+        doc = DocumentManager.createUntitledDocument(count, ext ? "." + ext : "");
 
         doc.setText(data);
         CommandManager.execute(Commands.CMD_OPEN, doc.file);
