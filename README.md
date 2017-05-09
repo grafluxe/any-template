@@ -39,6 +39,12 @@ Restart Brackets after install.
 
 ## Changelog
 
+### 2.4.1
+
+- Update "Overwrite Current Document" logic to only support files of the same type.
+- Fix issue with how files with no extension are handled when adding the extension to newly created untitled files (see v2.4.0).
+- Make code more DRY.
+
 ### 2.4.0
 
 - Add file extensions to newly created untitled files (so that code hinting and formatting works).

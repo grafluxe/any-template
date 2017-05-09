@@ -21,7 +21,6 @@ define((require, exports, module) => {
       PreferencesManager = brackets.getModule("preferences/PreferencesManager"),
       MainViewManager = brackets.getModule("view/MainViewManager"),
       templatesPath,
-      registeredFiles,
       fileId,
       init,
       prefs,
@@ -35,7 +34,8 @@ define((require, exports, module) => {
       menuOpenDir,
       openModule,
       readFile,
-      count = 10;
+      count = 10,
+      showModal;
 
   init = () => {
     prefs = PreferencesManager.getExtensionPrefs("anyTemplate");
@@ -52,21 +52,19 @@ define((require, exports, module) => {
   };
 
   initModule = () => {
-    Dialogs.showModalDialog(
-        "anyTpl",
-        "Any Template",
-        "Select a folder to load your templates from. <br>Note: If ever you need to edit the folders path, you can find it in your preference file.",
-        [
-          {
-            id: "select",
-            text: "Select A Folder"
-          },
-          {
-            id: "cancel",
-            text: "Cancel"
-          }
-        ]
-      ).done(onInitModule);
+    showModal(
+      "Select a folder to load your templates from. <br>Note: If ever you need to edit the folders path, you can find it in your preference file.",
+      [
+        {
+          id: "select",
+          text: "Select A Folder"
+        },
+        {
+          id: "cancel",
+          text: "Cancel"
+        }
+      ]
+    ).done(onInitModule);
   };
 
   onInitModule = (id) => {
@@ -89,15 +87,8 @@ define((require, exports, module) => {
   selectDir = (err, fi) => {
     if (err) {
       console.error(err);
-      Dialogs.showModalDialog(
-        "anyTpl",
-        "Any Template",
-        "There was an error with your selection."
-      );
-      return;
-    }
-
-    if (fi.length === 0) {
+      showModal("There was an error with your selection.");
+    } else if (fi.length === 0) {
       initModule();
     } else {
       templatesPath = fi[0];
@@ -120,11 +111,17 @@ define((require, exports, module) => {
 
       files.forEach((el) => {
         if (el.isFile) {
-          fType = FileUtils.getFileExtension(el.name) || ".";
+          fType = FileUtils.getFileExtension(el.name).toLowerCase();
           fName = FileUtils.getFilenameWithoutExtension(el.name);
 
+          //fix for hidden files in Windows
+          if (!fName && el.name.slice(0, 1) === ".") {
+            fName = fType;
+            fType = "";
+          }
+
           toSort.push({
-            name: "<" + fType + "> " + fName,
+            name: "<" + (fType || ".") + "> " + fName,
             file: el,
             type: fType
           });
@@ -139,30 +136,21 @@ define((require, exports, module) => {
   };
 
   menuFiles = (items) => {
-    registeredFiles = {};
-
-    items.forEach((el, i) => {
-      registeredFiles["anyTpl" + i] = el.file;
-
-      CommandManager.register(el.name, "anyTpl" + i, () => {
-        fileId = "anyTpl" + i;
-        openModule();
-      });
-
-      Menus.getMenu("anyTplMenu").addMenuItem("anyTpl" + i);
-    });
-
-    //empty templates dir
     if (items.length === 0) {
       CommandManager.register("- empty -", "anyTplNull", () => {
-        Dialogs.showModalDialog(
-          "anyTpl",
-          "Any Template",
-          "Add files to your templates folder in order to make them available in the \"Template\" menu. <br>Once you add files, restart Brackets."
-        );
+        showModal("Add files to your templates folder in order to make them available in the \"Template\" menu. <br>Once you add files, restart Brackets.");
       });
 
       Menus.getMenu("anyTplMenu").addMenuItem("anyTplNull");
+    } else {
+      items.forEach((fileData, i) => {
+        CommandManager.register(fileData.name, "anyTpl" + i, () => {
+          fileId = "anyTpl" + i;
+          openModule(fileData);
+        });
+
+        Menus.getMenu("anyTplMenu").addMenuItem("anyTpl" + i);
+      });
     }
   };
 
@@ -170,11 +158,7 @@ define((require, exports, module) => {
     CommandManager.register("Open Templates Folder...", "anyTplOpenDir", () => {
       brackets.app.showOSFolder(templatesPath, (id) => {
         if (id) {
-          Dialogs.showModalDialog(
-            "anyTpl",
-            "Any Template",
-            "Your folder no longer exists. Please update the path in your preference file and restart Brackets."
-          );
+          showModal("Your folder no longer exists. Please update the path in your preference file and restart Brackets.");
         }
       });
     });
@@ -183,10 +167,10 @@ define((require, exports, module) => {
     Menus.getMenu("anyTplMenu").addMenuItem("anyTplOpenDir");
   };
 
-  openModule = () => {
-    Dialogs.showModalDialog(
-      "anyTpl",
-      "Any Template",
+  openModule = (fileData) => {
+    let currDocExt;
+
+    showModal(
       "Which action would you like to take?",
       [
         {
@@ -202,32 +186,34 @@ define((require, exports, module) => {
           text: "Cancel"
         }
       ]
-    ).done(readFile);
+    ).done((id) => {
+      currDocExt = FileUtils.getFileExtension(DocumentManager.getCurrentDocument().file.name).toLowerCase();
+
+      if (id === "overwrite" && fileData.type !== currDocExt) {
+        showModal("You cannot overwrite this file because it is of a different type. <br>Please choose to create an untitled document instead.").done(() => {
+          openModule(fileData);
+        });
+      } else {
+        readFile(fileData, id);
+      }
+    });
   };
 
-  readFile = (id) => {
+  readFile = (fileData, id) => {
     let doc,
-        fi = registeredFiles[fileId],
-        ext = FileUtils.getFileExtension(fi.name);
+        ext = (fileData.type ? "." + fileData.type : "");
 
-    fi.read((err, data) => {
-      if (id === "cancel") {
-        return;
-      }
+    if (id === "cancel") {
+      return;
+    }
 
+    fileData.file.read((err, data) => {
       if (err) {
-        Dialogs.showModalDialog(
-          "anyTpl",
-          "Any Template",
-          "There was an error loading your template file. Check your templates folder and restart Brackets."
-        );
+        showModal("There was an error loading your template file. Check your templates folder and restart Brackets.");
 
         console.error("Template Error:", err);
-        return;
-      }
-
-      if (id === "untitled") {
-        doc = DocumentManager.createUntitledDocument(count, (ext ? "." + ext : ""));
+      } else if (id === "untitled") {
+        doc = DocumentManager.createUntitledDocument(count, ext);
 
         doc.setText(data);
         CommandManager.execute(Commands.CMD_OPEN, doc.file);
@@ -235,6 +221,14 @@ define((require, exports, module) => {
         DocumentManager.getCurrentDocument().setText(data);
       }
     });
+  };
+
+  showModal = (...rest) => {
+    return Dialogs.showModalDialog(
+      "anyTpl",
+      "Any Template",
+      ...rest
+    );
   };
 
   AppInit.appReady(init);

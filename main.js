@@ -23,7 +23,6 @@ define(function (require, exports, module) {
       PreferencesManager = brackets.getModule("preferences/PreferencesManager"),
       MainViewManager = brackets.getModule("view/MainViewManager"),
       templatesPath = void 0,
-      registeredFiles = void 0,
       fileId = void 0,
       init = void 0,
       prefs = void 0,
@@ -35,9 +34,10 @@ define(function (require, exports, module) {
       getContents = void 0,
       menuFiles = void 0,
       menuOpenDir = void 0,
-      openModule = void 0,
+      _openModule = void 0,
       readFile = void 0,
-      count = 10;
+      count = 10,
+      showModal = void 0;
 
   init = function init() {
     prefs = PreferencesManager.getExtensionPrefs("anyTemplate");
@@ -56,7 +56,7 @@ define(function (require, exports, module) {
   };
 
   initModule = function initModule() {
-    Dialogs.showModalDialog("anyTpl", "Any Template", "Select a folder to load your templates from. <br>Note: If ever you need to edit the folders path, you can find it in your preference file.", [{
+    showModal("Select a folder to load your templates from. <br>Note: If ever you need to edit the folders path, you can find it in your preference file.", [{
       id: "select",
       text: "Select A Folder"
     }, {
@@ -78,11 +78,8 @@ define(function (require, exports, module) {
   selectDir = function selectDir(err, fi) {
     if (err) {
       console.error(err);
-      Dialogs.showModalDialog("anyTpl", "Any Template", "There was an error with your selection.");
-      return;
-    }
-
-    if (fi.length === 0) {
+      showModal("There was an error with your selection.");
+    } else if (fi.length === 0) {
       initModule();
     } else {
       templatesPath = fi[0];
@@ -105,11 +102,17 @@ define(function (require, exports, module) {
 
       files.forEach(function (el) {
         if (el.isFile) {
-          fType = FileUtils.getFileExtension(el.name) || ".";
+          fType = FileUtils.getFileExtension(el.name).toLowerCase();
           fName = FileUtils.getFilenameWithoutExtension(el.name);
 
+          //fix for hidden files in Windows
+          if (!fName && el.name.slice(0, 1) === ".") {
+            fName = fType;
+            fType = "";
+          }
+
           toSort.push({
-            name: "<" + fType + "> " + fName,
+            name: "<" + (fType || ".") + "> " + fName,
             file: el,
             type: fType
           });
@@ -126,26 +129,21 @@ define(function (require, exports, module) {
   };
 
   menuFiles = function menuFiles(items) {
-    registeredFiles = {};
-
-    items.forEach(function (el, i) {
-      registeredFiles["anyTpl" + i] = el.file;
-
-      CommandManager.register(el.name, "anyTpl" + i, function () {
-        fileId = "anyTpl" + i;
-        openModule();
-      });
-
-      Menus.getMenu("anyTplMenu").addMenuItem("anyTpl" + i);
-    });
-
-    //empty templates dir
     if (items.length === 0) {
       CommandManager.register("- empty -", "anyTplNull", function () {
-        Dialogs.showModalDialog("anyTpl", "Any Template", "Add files to your templates folder in order to make them available in the \"Template\" menu. <br>Once you add files, restart Brackets.");
+        showModal("Add files to your templates folder in order to make them available in the \"Template\" menu. <br>Once you add files, restart Brackets.");
       });
 
       Menus.getMenu("anyTplMenu").addMenuItem("anyTplNull");
+    } else {
+      items.forEach(function (fileData, i) {
+        CommandManager.register(fileData.name, "anyTpl" + i, function () {
+          fileId = "anyTpl" + i;
+          _openModule(fileData);
+        });
+
+        Menus.getMenu("anyTplMenu").addMenuItem("anyTpl" + i);
+      });
     }
   };
 
@@ -153,7 +151,7 @@ define(function (require, exports, module) {
     CommandManager.register("Open Templates Folder...", "anyTplOpenDir", function () {
       brackets.app.showOSFolder(templatesPath, function (id) {
         if (id) {
-          Dialogs.showModalDialog("anyTpl", "Any Template", "Your folder no longer exists. Please update the path in your preference file and restart Brackets.");
+          showModal("Your folder no longer exists. Please update the path in your preference file and restart Brackets.");
         }
       });
     });
@@ -162,8 +160,10 @@ define(function (require, exports, module) {
     Menus.getMenu("anyTplMenu").addMenuItem("anyTplOpenDir");
   };
 
-  openModule = function openModule() {
-    Dialogs.showModalDialog("anyTpl", "Any Template", "Which action would you like to take?", [{
+  _openModule = function openModule(fileData) {
+    var currDocExt = void 0;
+
+    showModal("Which action would you like to take?", [{
       id: "untitled",
       text: "Create Untitled Document"
     }, {
@@ -172,28 +172,34 @@ define(function (require, exports, module) {
     }, {
       id: "cancel",
       text: "Cancel"
-    }]).done(readFile);
+    }]).done(function (id) {
+      currDocExt = FileUtils.getFileExtension(DocumentManager.getCurrentDocument().file.name).toLowerCase();
+
+      if (id === "overwrite" && fileData.type !== currDocExt) {
+        showModal("You cannot overwrite this file because it is of a different type. <br>Please choose to create an untitled document instead.").done(function () {
+          _openModule(fileData);
+        });
+      } else {
+        readFile(fileData, id);
+      }
+    });
   };
 
-  readFile = function readFile(id) {
+  readFile = function readFile(fileData, id) {
     var doc = void 0,
-        fi = registeredFiles[fileId],
-        ext = FileUtils.getFileExtension(fi.name);
+        ext = fileData.type ? "." + fileData.type : "";
 
-    fi.read(function (err, data) {
-      if (id === "cancel") {
-        return;
-      }
+    if (id === "cancel") {
+      return;
+    }
 
+    fileData.file.read(function (err, data) {
       if (err) {
-        Dialogs.showModalDialog("anyTpl", "Any Template", "There was an error loading your template file. Check your templates folder and restart Brackets.");
+        showModal("There was an error loading your template file. Check your templates folder and restart Brackets.");
 
         console.error("Template Error:", err);
-        return;
-      }
-
-      if (id === "untitled") {
-        doc = DocumentManager.createUntitledDocument(count, ext ? "." + ext : "");
+      } else if (id === "untitled") {
+        doc = DocumentManager.createUntitledDocument(count, ext);
 
         doc.setText(data);
         CommandManager.execute(Commands.CMD_OPEN, doc.file);
@@ -201,6 +207,14 @@ define(function (require, exports, module) {
         DocumentManager.getCurrentDocument().setText(data);
       }
     });
+  };
+
+  showModal = function showModal() {
+    for (var _len = arguments.length, rest = Array(_len), _key = 0; _key < _len; _key++) {
+      rest[_key] = arguments[_key];
+    }
+
+    return Dialogs.showModalDialog.apply(Dialogs, ["anyTpl", "Any Template"].concat(rest));
   };
 
   AppInit.appReady(init);
