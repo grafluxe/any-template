@@ -39,6 +39,10 @@ Restart Brackets after install.
 
 ## Changelog
 
+### 2.4.2
+
+- Fix issue where an error occurs when attempting to use a template when no working files are open.
+
 ### 2.4.1
 
 - Update "Overwrite Current Document" logic to only support files of the same type.

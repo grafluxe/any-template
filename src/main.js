@@ -168,7 +168,8 @@ define((require, exports, module) => {
   };
 
   openModule = (fileData) => {
-    let currDocExt;
+    let currDoc,
+        currDocExt;
 
     showModal(
       "Which action would you like to take?",
@@ -187,7 +188,13 @@ define((require, exports, module) => {
         }
       ]
     ).done((id) => {
-      currDocExt = FileUtils.getFileExtension(DocumentManager.getCurrentDocument().file.name).toLowerCase();
+      currDoc = DocumentManager.getCurrentDocument();
+
+      if (currDoc) {
+        currDocExt = FileUtils.getFileExtension(currDoc.file.name).toLowerCase();
+      } else {
+        id = "untitled";
+      }
 
       if (id === "overwrite" && fileData.type !== currDocExt) {
         showModal("You cannot overwrite this file because it is of a different type. <br>Please choose to create an untitled document instead.").done(() => {
