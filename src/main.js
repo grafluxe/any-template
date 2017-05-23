@@ -21,21 +21,22 @@ define((require, exports, module) => {
       PreferencesManager = brackets.getModule("preferences/PreferencesManager"),
       MainViewManager = brackets.getModule("view/MainViewManager"),
       templatesPath,
-      fileId,
       init,
       prefs,
       initModule,
-      onInitModule,
       selectDir,
       setPath,
       setMenu,
-      getContents,
-      menuFiles,
+      getTemplates,
+      menuList,
       menuOpenDir,
-      openModule,
-      readFile,
+      selectActionModal,
+      onOverwrite,
+      onUntitled,
+      onReadErr,
       count = 10,
-      showModal;
+      showModal,
+      selectedItem;
 
   init = () => {
     prefs = PreferencesManager.getExtensionPrefs("anyTemplate");
@@ -45,7 +46,7 @@ define((require, exports, module) => {
 
     if (templatesPath) {
       setMenu();
-      getContents();
+      getTemplates();
     } else {
       initModule();
     }
@@ -64,13 +65,11 @@ define((require, exports, module) => {
           text: "Cancel"
         }
       ]
-    ).done(onInitModule);
-  };
-
-  onInitModule = (id) => {
-    if (id === "select") {
-      setPath();
-    }
+    ).done(id => {
+      if (id === "select") {
+        setPath();
+      }
+    });
   };
 
   setPath = () => {
@@ -95,7 +94,7 @@ define((require, exports, module) => {
       prefs.set("templatesPath", templatesPath);
 
       setMenu();
-      getContents();
+      getTemplates();
     }
   };
 
@@ -103,39 +102,38 @@ define((require, exports, module) => {
     Menus.addMenu("Template", "anyTplMenu", Menus.AFTER, Menus.AppMenuBar.NAVIGATE_MENU);
   };
 
-  getContents = () => {
+  getTemplates = () => {
     FileSystem.getDirectoryForPath(templatesPath).getContents((a, files) => {
       let toSort = [],
-          fType,
-          fName;
+          fName,
+          fType;
 
       files.forEach((el) => {
         if (el.isFile) {
-          fType = FileUtils.getFileExtension(el.name).toLowerCase();
           fName = FileUtils.getFilenameWithoutExtension(el.name);
+          fType = FileUtils.getFileExtension(el.name).toLowerCase();
 
-          //fix for hidden files in Windows
-          if (!fName && el.name.slice(0, 1) === ".") {
+          if (!fName) {
             fName = fType;
-            fType = "";
+            fType = ".";
           }
 
           toSort.push({
-            name: "<" + (fType || ".") + "> " + fName,
+            menuName: "<" + (fType || " ") + "> " + fName,
             file: el,
             type: fType
           });
         }
       });
 
-      toSort.sort((a, b) => a.name.localeCompare(b.name));
+      toSort.sort((a, b) => a.menuName.localeCompare(b.menuName));
 
-      menuFiles(toSort);
+      menuList(toSort);
       menuOpenDir();
     });
   };
 
-  menuFiles = (items) => {
+  menuList = (items) => {
     if (items.length === 0) {
       CommandManager.register("- empty -", "anyTplNull", () => {
         showModal("Add files to your templates folder in order to make them available in the \"Template\" menu. <br>Once you add files, restart Brackets.");
@@ -143,10 +141,10 @@ define((require, exports, module) => {
 
       Menus.getMenu("anyTplMenu").addMenuItem("anyTplNull");
     } else {
-      items.forEach((fileData, i) => {
-        CommandManager.register(fileData.name, "anyTpl" + i, () => {
-          fileId = "anyTpl" + i;
-          openModule(fileData);
+      items.forEach((data, i) => {
+        CommandManager.register(data.menuName, "anyTpl" + i, () => {
+          selectedItem = data;
+          selectActionModal();
         });
 
         Menus.getMenu("anyTplMenu").addMenuItem("anyTpl" + i);
@@ -167,10 +165,7 @@ define((require, exports, module) => {
     Menus.getMenu("anyTplMenu").addMenuItem("anyTplOpenDir");
   };
 
-  openModule = (fileData) => {
-    let currDoc,
-        currDocExt;
-
+  selectActionModal = () => {
     showModal(
       "Which action would you like to take?",
       [
@@ -188,46 +183,58 @@ define((require, exports, module) => {
         }
       ]
     ).done((id) => {
-      currDoc = DocumentManager.getCurrentDocument();
-
-      if (currDoc) {
-        currDocExt = FileUtils.getFileExtension(currDoc.file.name).toLowerCase();
-      } else {
-        id = "untitled";
-      }
-
-      if (id === "overwrite" && fileData.type !== currDocExt) {
-        showModal("You cannot overwrite this file because it is of a different type. <br>Please choose to create an untitled document instead.").done(() => {
-          openModule(fileData);
-        });
-      } else {
-        readFile(fileData, id);
+      switch (id) {
+        case "overwrite":
+          onOverwrite();
+          break;
+        case "untitled":
+          onUntitled();
+          break;
       }
     });
   };
 
-  readFile = (fileData, id) => {
-    let doc,
-        ext = (fileData.type ? "." + fileData.type : "");
+  onOverwrite = () => {
+     let currDoc = DocumentManager.getCurrentDocument(),
+         currType;
 
-    if (id === "cancel") {
-      return;
+    if (currDoc) {
+      currType = (FileUtils.getFilenameWithoutExtension(currDoc.file.name) ? FileUtils.getFileExtension(currDoc.file.name).toLowerCase() : ".");
     }
 
-    fileData.file.read((err, data) => {
+    if (selectedItem.type !== currType) {
+      showModal("You cannot overwrite this file because it is of a different type. <br>Please choose to create an untitled document instead.").done(() => {
+        selectActionModal();
+      });
+    } else {
+      selectedItem.file.read((err, data) => {
+        if (err) {
+          onReadErr(err);
+        } else {
+          DocumentManager.getCurrentDocument().setText(data);
+        }
+      });
+    }
+  };
+
+  onUntitled = () => {
+    let newDoc;
+
+    selectedItem.file.read((err, data) => {
       if (err) {
-        showModal("There was an error loading your template file. Check your templates folder and restart Brackets.");
+        onReadErr(err);
+      } else {
+        newDoc = DocumentManager.createUntitledDocument(count, (selectedItem.type ? "." + selectedItem.type : ""));
 
-        console.error("Template Error:", err);
-      } else if (id === "untitled") {
-        doc = DocumentManager.createUntitledDocument(count, ext);
-
-        doc.setText(data);
-        CommandManager.execute(Commands.CMD_OPEN, doc.file);
-      } else if (id === "overwrite") {
-        DocumentManager.getCurrentDocument().setText(data);
+        newDoc.setText(data);
+        CommandManager.execute(Commands.CMD_OPEN, newDoc.file);
       }
     });
+  };
+
+  onReadErr = (err) => {
+    showModal("There was an error loading your template file. Check your templates folder and restart Brackets.");
+    console.error("Template Error:", err);
   };
 
   showModal = (...rest) => {

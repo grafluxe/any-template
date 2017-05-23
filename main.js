@@ -23,21 +23,22 @@ define(function (require, exports, module) {
       PreferencesManager = brackets.getModule("preferences/PreferencesManager"),
       MainViewManager = brackets.getModule("view/MainViewManager"),
       templatesPath = void 0,
-      fileId = void 0,
       init = void 0,
       prefs = void 0,
       initModule = void 0,
-      onInitModule = void 0,
       selectDir = void 0,
       setPath = void 0,
       setMenu = void 0,
-      getContents = void 0,
-      menuFiles = void 0,
+      getTemplates = void 0,
+      menuList = void 0,
       menuOpenDir = void 0,
-      _openModule = void 0,
-      readFile = void 0,
+      selectActionModal = void 0,
+      onOverwrite = void 0,
+      onUntitled = void 0,
+      onReadErr = void 0,
       count = 10,
-      showModal = void 0;
+      showModal = void 0,
+      selectedItem = void 0;
 
   init = function init() {
     prefs = PreferencesManager.getExtensionPrefs("anyTemplate");
@@ -49,7 +50,7 @@ define(function (require, exports, module) {
 
     if (templatesPath) {
       setMenu();
-      getContents();
+      getTemplates();
     } else {
       initModule();
     }
@@ -62,13 +63,11 @@ define(function (require, exports, module) {
     }, {
       id: "cancel",
       text: "Cancel"
-    }]).done(onInitModule);
-  };
-
-  onInitModule = function onInitModule(id) {
-    if (id === "select") {
-      setPath();
-    }
+    }]).done(function (id) {
+      if (id === "select") {
+        setPath();
+      }
+    });
   };
 
   setPath = function setPath() {
@@ -86,7 +85,7 @@ define(function (require, exports, module) {
       prefs.set("templatesPath", templatesPath);
 
       setMenu();
-      getContents();
+      getTemplates();
     }
   };
 
@@ -94,25 +93,24 @@ define(function (require, exports, module) {
     Menus.addMenu("Template", "anyTplMenu", Menus.AFTER, Menus.AppMenuBar.NAVIGATE_MENU);
   };
 
-  getContents = function getContents() {
+  getTemplates = function getTemplates() {
     FileSystem.getDirectoryForPath(templatesPath).getContents(function (a, files) {
       var toSort = [],
-          fType = void 0,
-          fName = void 0;
+          fName = void 0,
+          fType = void 0;
 
       files.forEach(function (el) {
         if (el.isFile) {
-          fType = FileUtils.getFileExtension(el.name).toLowerCase();
           fName = FileUtils.getFilenameWithoutExtension(el.name);
+          fType = FileUtils.getFileExtension(el.name).toLowerCase();
 
-          //fix for hidden files in Windows
-          if (!fName && el.name.slice(0, 1) === ".") {
+          if (!fName) {
             fName = fType;
-            fType = "";
+            fType = ".";
           }
 
           toSort.push({
-            name: "<" + (fType || ".") + "> " + fName,
+            menuName: "<" + (fType || " ") + "> " + fName,
             file: el,
             type: fType
           });
@@ -120,15 +118,15 @@ define(function (require, exports, module) {
       });
 
       toSort.sort(function (a, b) {
-        return a.name.localeCompare(b.name);
+        return a.menuName.localeCompare(b.menuName);
       });
 
-      menuFiles(toSort);
+      menuList(toSort);
       menuOpenDir();
     });
   };
 
-  menuFiles = function menuFiles(items) {
+  menuList = function menuList(items) {
     if (items.length === 0) {
       CommandManager.register("- empty -", "anyTplNull", function () {
         showModal("Add files to your templates folder in order to make them available in the \"Template\" menu. <br>Once you add files, restart Brackets.");
@@ -136,10 +134,10 @@ define(function (require, exports, module) {
 
       Menus.getMenu("anyTplMenu").addMenuItem("anyTplNull");
     } else {
-      items.forEach(function (fileData, i) {
-        CommandManager.register(fileData.name, "anyTpl" + i, function () {
-          fileId = "anyTpl" + i;
-          _openModule(fileData);
+      items.forEach(function (data, i) {
+        CommandManager.register(data.menuName, "anyTpl" + i, function () {
+          selectedItem = data;
+          selectActionModal();
         });
 
         Menus.getMenu("anyTplMenu").addMenuItem("anyTpl" + i);
@@ -160,10 +158,7 @@ define(function (require, exports, module) {
     Menus.getMenu("anyTplMenu").addMenuItem("anyTplOpenDir");
   };
 
-  _openModule = function openModule(fileData) {
-    var currDoc = void 0,
-        currDocExt = void 0;
-
+  selectActionModal = function selectActionModal() {
     showModal("Which action would you like to take?", [{
       id: "untitled",
       text: "Create Untitled Document"
@@ -174,46 +169,58 @@ define(function (require, exports, module) {
       id: "cancel",
       text: "Cancel"
     }]).done(function (id) {
-      currDoc = DocumentManager.getCurrentDocument();
-
-      if (currDoc) {
-        currDocExt = FileUtils.getFileExtension(currDoc.file.name).toLowerCase();
-      } else {
-        id = "untitled";
-      }
-
-      if (id === "overwrite" && fileData.type !== currDocExt) {
-        showModal("You cannot overwrite this file because it is of a different type. <br>Please choose to create an untitled document instead.").done(function () {
-          _openModule(fileData);
-        });
-      } else {
-        readFile(fileData, id);
+      switch (id) {
+        case "overwrite":
+          onOverwrite();
+          break;
+        case "untitled":
+          onUntitled();
+          break;
       }
     });
   };
 
-  readFile = function readFile(fileData, id) {
-    var doc = void 0,
-        ext = fileData.type ? "." + fileData.type : "";
+  onOverwrite = function onOverwrite() {
+    var currDoc = DocumentManager.getCurrentDocument(),
+        currType = void 0;
 
-    if (id === "cancel") {
-      return;
+    if (currDoc) {
+      currType = FileUtils.getFilenameWithoutExtension(currDoc.file.name) ? FileUtils.getFileExtension(currDoc.file.name).toLowerCase() : ".";
     }
 
-    fileData.file.read(function (err, data) {
+    if (selectedItem.type !== currType) {
+      showModal("You cannot overwrite this file because it is of a different type. <br>Please choose to create an untitled document instead.").done(function () {
+        selectActionModal();
+      });
+    } else {
+      selectedItem.file.read(function (err, data) {
+        if (err) {
+          onReadErr(err);
+        } else {
+          DocumentManager.getCurrentDocument().setText(data);
+        }
+      });
+    }
+  };
+
+  onUntitled = function onUntitled() {
+    var newDoc = void 0;
+
+    selectedItem.file.read(function (err, data) {
       if (err) {
-        showModal("There was an error loading your template file. Check your templates folder and restart Brackets.");
+        onReadErr(err);
+      } else {
+        newDoc = DocumentManager.createUntitledDocument(count, selectedItem.type ? "." + selectedItem.type : "");
 
-        console.error("Template Error:", err);
-      } else if (id === "untitled") {
-        doc = DocumentManager.createUntitledDocument(count, ext);
-
-        doc.setText(data);
-        CommandManager.execute(Commands.CMD_OPEN, doc.file);
-      } else if (id === "overwrite") {
-        DocumentManager.getCurrentDocument().setText(data);
+        newDoc.setText(data);
+        CommandManager.execute(Commands.CMD_OPEN, newDoc.file);
       }
     });
+  };
+
+  onReadErr = function onReadErr(err) {
+    showModal("There was an error loading your template file. Check your templates folder and restart Brackets.");
+    console.error("Template Error:", err);
   };
 
   showModal = function showModal() {
