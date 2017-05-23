@@ -39,6 +39,11 @@ Restart Brackets after install.
 
 ## Changelog
 
+### 2.5.0
+
+- Improve support for hidden files.
+- Improve support for files with no extension.
+
 ### 2.4.2
 
 - Fix issue where an error occurs when attempting to use a template when no working files are open.
