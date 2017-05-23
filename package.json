@@ -4,7 +4,7 @@
   "description": "Easily create and use YOUR own template files. This extension adds a new menu item to the main menu bar which lists any template files you create. Templates can be of any file type supported by Brackets.",
   "author": "Leandro Silva (http://grafluxe.com)",
   "homepage": "https://github.com/Grafluxe/any-template",
-  "version": "2.4.2",
+  "version": "2.5.0",
   "categories": "codegen",
   "license": "MIT",
   "engines": {
@@ -22,7 +22,7 @@
     "snippet"
   ],
   "scripts": {
-    "babel": "babel src/main.js -o main.js"
+    "dist": "babel src/main.js -o main.js"
   },
   "devDependencies": {
     "babel-cli": "^6.18.0",
